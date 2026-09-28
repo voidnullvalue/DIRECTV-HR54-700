@@ -247,7 +247,6 @@ HDMI output</code></pre>
     <p>I had no reason to replace Linux or write a video driver. I wanted to reuse all of that.</p>
 
     <h2>Persistent root came from the plugin loader</h2>
-
     <p>The receiver has a boot-time plugin mechanism that eventually runs a deployment path as root.</p>
 
     <p>The useful bug was simple: one part of the loader verified a genuine signed image, while a later part resolved what it mounted by filename. Those were not bound tightly enough to the same file.</p>
@@ -497,7 +496,6 @@ Broadcom decoder
 HDMI</code></pre>
 
     <p><code>.25</code> can be shut off. The receiver does not care.</p>
-
     <h2>Wi-Fi was annoyingly proprietary</h2>
 
     <p>The receiver has Wi-Fi hardware but none of the normal Linux setup tools I expected. No <code>wpa_supplicant</code>, no useful <code>iw</code> workflow, no NetworkManager.</p>
@@ -637,7 +635,7 @@ helper-PC dependency</code></pre>
 
   <footer>
     <div class="wrap">
-      <span>void@hr54:~$ </span><a href="https://github.com/voidnullvalue/DIRECTV-HR54-700">github.com/voidnullvalue/DIRECTV-HR54-700</a><span> </span><span class="cursor" aria-hidden="true"></span>
+      <span>void@hr54:~$ cd /dev/void &amp;&amp; </span><a href="https://voidnullvalue.github.io/Enter-dev-void/">Enter /dev/void/</a><span> :: </span><a href="https://github.com/voidnullvalue/DIRECTV-HR54-700">source</a><span> </span><span class="cursor" aria-hidden="true"></span>
     </div>
   </footer>
 </body>
