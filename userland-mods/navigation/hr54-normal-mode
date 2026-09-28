@@ -1,0 +1,66 @@
+#!/bin/sh
+# Persistent local offline UI policy. Never alters tuner or subscriber state.
+set -eu
+base=/var/opt/hr54
+osd=/var/mw_registry/Registry/Device/Server/OSD/Current
+flag=/var/hr54-persist/normal-mode.enabled
+pidfile=$base/normal-mode.pid
+log=$base/log/normal-mode.log
+uc=/opt/middleware_core/system/tv/uconntest
+read_value() { cat "$osd/$1" 2>/dev/null || printf unknown; }
+is_775() {
+  number=$(read_value Number)
+  extension=$(read_value Extension)
+  [ "$number" = '"36"' ] || [ "$number" = 36 ] || return 1
+  [ "$extension" = 775 ]
+}
+ready() {
+  [ -r "$osd/Number" ] || return 1
+  "$uc" '<com.directv.druid.dt.DruidTester command="getCurrentScreenId" session="local"/>' 2>&1 |
+    grep -q 'Current screenId for session 0 is '
+}
+record() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >> "$log"; }
+clear_775() {
+  if is_775; then
+    /usr/bin/dt removeOsd -osd 36 -session 0 >> "$log" 2>&1
+    record 'removed 36/775'
+  fi
+}
+run() {
+  lock=/tmp/hr54-normal-mode.lock
+  mkdir "$lock" 2>/dev/null || exit 0
+  trap '[ "$(cat "$pidfile" 2>/dev/null)" = "$$" ] && rm -f "$pidfile"; rmdir "$lock" 2>/dev/null || :' EXIT
+  trap 'exit 0' TERM INT
+  printf '%s\n' "$$" > "$pidfile"
+  while [ -f "$flag" ] && ! ready; do sleep 2; done
+  [ -f "$flag" ] || exit 0
+  clear_775
+  while [ -f "$flag" ] && ! "$base/bin/hr54-home" >> "$log" 2>&1; do
+    record 'Main Menu request pending; retrying'
+    sleep 2
+  done
+  while [ -f "$flag" ]; do
+    clear_775
+    sleep 2
+  done
+}
+mkdir -p "$base/log" /var/hr54-persist
+case "${1:-}" in
+  enable)
+    : > "$flag"
+    if [ -r "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+      clear_775
+    else
+      "$0" run </dev/null >> "$log" 2>&1 &
+    fi;;
+  disable)
+    rm -f "$flag"
+    if [ -r "$pidfile" ]; then kill "$(cat "$pidfile")" 2>/dev/null || :; fi
+    record 'disabled';;
+  status)
+    if [ -f "$flag" ]; then mode=enabled; else mode=disabled; fi
+    if [ -r "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then watcher=running; else watcher=stopped; fi
+    printf 'mode=%s watcher=%s osd=%s extension=%s\n' "$mode" "$watcher" "$(read_value Number)" "$(read_value Extension)";;
+  run) run;;
+  *) printf 'Usage: %s {enable|disable|status}\n' "$0" >&2; exit 2;;
+esac
