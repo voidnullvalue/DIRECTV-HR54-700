@@ -1,0 +1,179 @@
+# ---------------------------------------------------------------------------
+# THIS REPOSITORY MUST CONTAIN NO SECRETS.
+# Everything below is excluded by default so that a credential cannot be
+# committed by accident, by a hurried `cp`, or by a tool writing into the tree.
+# ---------------------------------------------------------------------------
+
+# --- credentials and keys (never commit) -----------------------------------
+*.key
+*.pem
+*.der
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.asc
+*.gpg
+*.token
+*.secret
+*.secrets
+*.credentials
+*.netrc
+.netrc
+id_rsa*
+id_ed25519*
+id_ecdsa*
+*.pubkey
+
+# --- explicit token / credential file names --------------------------------
+token
+tokens
+*token*
+*secret*
+*credential*
+*password*
+*passwd*
+*apikey*
+*api_key*
+*accesskey*
+
+# --- local, gitignored credential stores -----------------------------------
+# These are the files docs/WIFI.md and asset7/*.sh tell you to create locally.
+*wifi*.conf
+.config/hr54-wifi.conf
+.hr54-wifi.conf
+.hr54-sudo-pass
+.hr54-root.hash
+*.hr54-pass
+hr54-root.hash
+
+# --- Jellyfin / Quick Connect ----------------------------------------------
+config/token
+config/config.json
+**/config/token
+**/jellyfin/config/
+jellyfin.key
+api-key
+api_key
+apikey
+
+# --- NVRAM: original AND patched both contain a WiFi credential -------------
+# NB: match only IMAGES of the device, never the tooling that patches them.
+nvram0
+nvram0.*
+*.nvram0
+*.nvram.bin
+# the patcher itself IS tracked:
+!wifi/patch-nvram.py
+!wifi/*.c
+
+# --- device images, dumps, firmware ----------------------------------------
+*.img
+*.img.gz
+*.iso
+*.raw
+*.dump
+*.dd
+*.squashfs
+*.sqsh
+*.cpio
+*.cramfs
+*.ubifs
+*.jffs2
+*.mtd
+*.rootfs
+*rootfs*
+/sdb[0-9]*
+/raw/
+/nvram0
+*.nvram0.bin
+*dtv.car
+*.plugin
+
+# sparse geometry placeholder for XFS (916 GiB) -- regenerate with truncate
+sdb3-rt-placeholder.img
+
+# --- extracted vendor trees / build trees ----------------------------------
+build/
+build-*/
+asset7-build/
+asset7-original/
+*/build/asset7/
+*/build/asset7-original/
+__pycache__/
+*.pyc
+*.pyo
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.elf
+*.ko
+*.map
+vmlinux-*
+linux-image-*/
+initrd*.gz
+*-initrd.gz
+*.deb
+*.qcow2
+*.qcow
+*.vmdk
+*.vdi
+rootfs/
+*/root/
+
+# --- prebuilt binaries (regenerate from source) ---------------------------
+# See docs/NOT_INCLUDED.md section E.
+jellyfin/remote/bin/
+wifi/*.so
+wifi/nvtool
+linux-port/beachhead/hr54d
+linux-port/kexec/kexec-probe
+*.sig
+
+# --- runtime state, logs, scratch ------------------------------------------
+*.log
+*.log.*
+logs/
+*/logs/
+**/live-state/
+**/supervise/
+*.pid
+*.lock
+*.sock
+*.status
+*.stat
+mips-vm-*-console.log
+messages.log
+netevt.log
+aplDump*.txt
+*-fd
+*-maps
+tmp/
+scratch/
+.bak
+*.bak
+*.orig
+*.rej
+.DS_Store
+Thumbs.db
+
+# --- explicit: our own source is ALWAYS tracked ----------------------------
+# Belt and braces: these patterns above are intentionally broad, so make sure
+# no legitimate source file can be swept up by them.
+!**/*.py
+!**/*.c
+!**/*.sh
+!**/*.pl
+!jellyfin/remote/service/run
+!linux-port/beachhead/indexer
+!linux-port/beachhead/collect-inventory
+!userland-mods/navigation/hr54-home
+!userland-mods/navigation/hr54-normal-mode
+!jellyfin/tools/receiver-hr54-play-url
+!jellyfin/ui/receiver-rollback
