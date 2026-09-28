@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>I Turned a DIRECTV HR54-700 Into a Standalone Jellyfin Box</title>
+  <meta name="description" content="How I turned a DIRECTV HR54-700 Genie DVR into a standalone Jellyfin set-top box using persistent root, the stock Broadcom decoder, vendor WebKit, and a receiver-native backend.">
+  <meta name="theme-color" content="#0a0c0b">
+  <meta property="og:title" content="I Turned a DIRECTV HR54-700 Into a Standalone Jellyfin Box">
+  <meta property="og:description" content="Persistent root, vendor WebKit, Broadcom hardware decode, Quick Connect, Wi-Fi, and absolutely no helper PC left in the final architecture.">
+  <meta property="og:type" content="article">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0c0b;
+      --panel: #0f1210;
+      --text: #d9e0d8;
+      --muted: #7f8c80;
+      --dim: #566057;
+      --accent: #9be564;
+      --accent-2: #f0a35e;
+      --line: #232a24;
+      --code: #c7d6c7;
+      --max: 780px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      background: var(--bg);
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 16px;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    a:hover { color: #c4ff9d; }
+
+    .wrap {
+      width: min(calc(100% - 32px), var(--max));
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 44px 0 30px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .prompt {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .prompt .host { color: var(--accent); }
+    .prompt .path { color: var(--accent-2); }
+
+    h1, h2 {
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 19ch;
+      font-size: clamp(2rem, 7vw, 3.6rem);
+      font-weight: 700;
+      color: #eef5ed;
+    }
+
+    .dek {
+      margin: 22px 0 0;
+      max-width: 65ch;
+      color: var(--muted);
+      font-size: 1.03rem;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 22px;
+      color: var(--dim);
+      font-size: 13px;
+    }
+
+    main {
+      padding: 32px 0 64px;
+    }
+
+    h2 {
+      margin: 3.2rem 0 1rem;
+      font-size: 1.35rem;
+      color: #e7eee6;
+    }
+
+    h2::before {
+      content: "## ";
+      color: var(--accent);
+    }
+
+    p { margin: 1rem 0; }
+    strong { color: #f0f4ef; }
+
+    blockquote {
+      margin: 1.5rem 0;
+      padding: 0.2rem 0 0.2rem 1rem;
+      border-left: 2px solid var(--accent);
+      color: #edf3ec;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 1.4rem 0;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: var(--panel);
+      color: var(--code);
+      line-height: 1.45;
+      font-size: 14px;
+      tab-size: 2;
+    }
+
+    code {
+      font-family: inherit;
+      color: var(--code);
+    }
+
+    p code {
+      padding: 0.12rem 0.3rem;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--panel);
+      font-size: 0.94em;
+    }
+
+    .lede {
+      font-size: 1.08rem;
+      color: #e4eae3;
+    }
+
+    .rule {
+      height: 1px;
+      margin: 3rem 0;
+      background: var(--line);
+    }
+
+    footer {
+      padding: 24px 0 48px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 0.65ch;
+      height: 1.05em;
+      margin-left: 0.2ch;
+      vertical-align: -0.14em;
+      background: var(--accent);
+      animation: blink 1.15s steps(1, end) infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cursor { animation: none; }
+      html { scroll-behavior: auto; }
+    }
+
+    @media (max-width: 560px) {
+      body { font-size: 15px; }
+      header { padding-top: 28px; }
+      pre { margin-left: -8px; margin-right: -8px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="prompt"><span class="host">void@hr54</span>:<span class="path">~/DIRECTV-HR54-700</span>$ cat README.md</p>
+      <h1>I Turned a DIRECTV HR54-700 Into a Standalone Jellyfin Box<span class="cursor" aria-hidden="true"></span></h1>
+      <p class="dek">A locked satellite DVR, a signed-plugin mistake, a proprietary Java-ish UI stack, a Broadcom decoder, and my refusal to leave a helper PC in the final design.</p>
+      <div class="meta">
+        <span>September 2026</span>
+        <span>DIRECTV HR54-700</span>
+        <span>Broadcom BCM7346B2 / MIPS32</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p class="lede">I had a DIRECTV HR54-700 Genie DVR that was basically useless to me in its intended role.</p>
+
+    <p>Which, naturally, meant I wanted to know what else it could do.</p>
+
+    <p>The answer turned out to be: quite a lot.</p>
+
+    <p>After a few days of poking at it, I had persistent root, a remote shell, a way to boot my own code, access to the vendor multimedia stack, a working hardware-decoded HTTP playback path, a TV UI running inside the receiver's own WebKit environment, Wi-Fi, Jellyfin Quick Connect, search, transport controls, and eventually a completely receiver-native Jellyfin client.</p>
+
+    <p>The finished box does not need a satellite dish.</p>
+
+    <p>It does not need a second PC acting as a proxy.</p>
+
+    <p>It boots, joins Wi-Fi, launches Jellyfin from the DIRECTV remote, talks directly to my Jellyfin server, transcodes into a format the Broadcom decoder likes, and plays it over HDMI.</p>
+
+    <p>That was not the architecture I started with.</p>
+
+    <p>I got there by repeatedly removing pieces until the only things left were the HR54 and Jellyfin.</p>
+
+    <h2>The hardware was better than the software deserved</h2>
+
+    <p>The HR54 is old, but it is not some toy microcontroller pretending to be a DVR.</p>
+
+<pre><code>DIRECTV HR54-700
+Broadcom BCM7346B2
+2x BMIPS5000 ~1.3 GHz
+MIPS32 big-endian o32
+1 GiB physical RAM
+Linux 3.3.8
+BusyBox 1.16.1
+uClibc 0.9.32.1
+1 TB WD AV-class hard drive</code></pre>
+
+    <p>The Linux root filesystem is a read-only SquashFS image.</p>
+
+    <p>The hard drive contains normal-ish Linux storage plus a giant recording partition and a firmware staging partition.</p>
+
+    <p>The interesting part is that the box already contains every expensive thing I actually need from a media client:</p>
+
+<pre><code>network stack
+HTTP clients
+vendor UI middleware
+WebKit
+MPEG transport handling
+H.264 decode
+AC3 decode
+HDMI output
+remote-control input</code></pre>
+
+    <p>So, much like my Google Glass project, the obvious conclusion was:</p>
+
+    <blockquote>Do not replace the hardware stack. Abuse the hardware stack.</blockquote>
+
+    <p>I did not need to port Linux.</p>
+
+    <p>I did not need a desktop environment.</p>
+
+    <p>I did not need to figure out how to initialize the Broadcom video pipeline from scratch.</p>
+
+    <p>DIRECTV had already done all of that work for me.</p>
+
+    <p>I just needed to get in front of it.</p>
+
+    <h2>The first useful bug was in the plugin path</h2>
+
+    <p>The receiver has a boot-time plugin mechanism.</p>
+
+    <p>That is exactly the sort of sentence that makes you stop whatever else you are doing.</p>
+
+    <p>The normal boot sequence eventually calls a plugin deployment script as root. The plugin loader verifies a signed image, then later resolves the image it actually mounts by filename.</p>
+
+    <p>Those two operations were not tied together as tightly as they should have been.</p>
+
+    <p>That gave me a path where a genuine signed image could satisfy the authentication step while a different same-basename image was what actually got mounted.</p>
+
+    <p>I did not forge a signature.</p>
+
+    <p>I did not have a signing key.</p>
+
+    <p>I just convinced two parts of the software to disagree about which file they were talking about.</p>
+
+    <p>That is enough.</p>
+
+    <p>I kept the real vendor payload that the system expected, wrapped the vendor indexer, and inserted my own startup logic before delegating back to the original binary.</p>
+
+    <p>That gave me persistent root execution every boot without touching flash.</p>
+
+<pre><code>boot
+ |
+ v
+vendor plugin deploy
+ |
+ v
+my asset-7 wrapper
+ |
+ +--> persistent setup
+ |
+ +--> root shell / helpers
+ |
+ `--> original vendor indexer</code></pre>
+
+    <p>That last part mattered.</p>
+
+    <p>I was not trying to turn the receiver into a science project that only boots when all the planets align.</p>
+
+    <p>I wanted the stock system to keep running.</p>
+
+    <p>So every useful modification became a reversible overlay under <code>/var</code>, with the original system still underneath it.</p>
+
+    <h2>A root shell changes the character of the problem</h2>
+
+    <p>Once I had reliable root, the project stopped being "can I hack this" and became "what useful machinery is already in here."</p>
+
+    <p>I exposed a root shell on TCP 5777 and used the receiver's existing transfer service for moving files around.</p>
+
+    <p>Then I started inventorying the middleware.</p>
+
+    <p>The stock DIRECTV application is a giant proprietary thing sitting on top of Linux, with Druid UI classes, a Siege VM, ITV/WebKit, a pile of Broadcom multimedia plumbing, and an impressive quantity of code dedicated to yelling at you about satellite state.</p>
+
+    <p>That last part became the next problem.</p>
+
+    <h2>The box would not shut up about the missing dish</h2>
+
+    <p>With no satellite hardware attached, the receiver really wants you to know about it.</p>
+
+    <p>The main blocker was OSD 36, extension 775.</p>
+
+    <p>The logs were actually pretty good here.</p>
+
+<pre><code>SWM not detected
+    |
+    v
+SignalManager NOT_DETECTED
+    |
+    v
+Aggregate775TestResult
+    |
+    v
+OSD 36 / extension 775</code></pre>
+
+    <p>I could remove it with the receiver's own diagnostic plumbing:</p>
+
+<pre><code>dt removeOsd -osd 36 -session 0</code></pre>
+
+    <p>That was enough to get normal menu navigation back.</p>
+
+    <p>I did spend some time trying to make the receiver believe in imaginary satellite hardware.</p>
+
+    <p>That was not the useful path.</p>
+
+    <p>The useful path was to stop caring about satellite state entirely.</p>
+
+    <h2>The real breakthrough was playURL</h2>
+
+    <p>The obvious bad idea was to make the stock DVR playback stack play Jellyfin content.</p>
+
+    <p>That ran directly into subscriber and access-card state.</p>
+
+    <p>The receiver knew it was not an authorized DVR subscriber, and the normal recorded-content path eventually produced the expected service errors.</p>
+
+    <p>Fine.</p>
+
+    <p>I do not actually need the DVR path.</p>
+
+    <p>Buried in the middleware was a generic remote-stream playback command:</p>
+
+<pre><code>&lt;com.ucentric.pvruconnect.DirectTest
+    command="playURL"
+    url="http://host/media.ts"/&gt;</code></pre>
+
+    <p>This was the point where the project stopped being theoretical.</p>
+
+    <p>I fed it a test transport stream.</p>
+
+    <p>The receiver fetched it over HTTP.</p>
+
+    <p>Then the stock media stack did exactly what it was built to do:</p>
+
+<pre><code>HTTP
+ |
+ v
+MediaPlayer.watchRemoteStream()
+ |
+ v
+dvr_core LocalPlayer
+ |
+ v
+RemoteMediaStream
+ |
+ v
+transport-stream demux
+ |
+ v
+Broadcom CDI/NEXUS
+ |
+ v
+HDMI</code></pre>
+
+    <p>The logs showed H.264 video, AC3 audio, decoder configuration, frame presentation, and normal playback position updates.</p>
+
+    <p>Then I looked at the TV.</p>
+
+    <p>Color bars.</p>
+
+    <p>Sine tone.</p>
+
+    <p>Good.</p>
+
+    <p>At that point I had arbitrary network media going through the original hardware decoder without touching DIRECTV's DVR entitlement path.</p>
+
+    <h2>Jellyfin was mostly a transcoding problem</h2>
+
+    <p>Once <code>playURL</code> worked, Jellyfin itself was not especially mysterious.</p>
+
+    <p>I needed Jellyfin to hand the HR54 something conservative enough that a 2010s embedded decoder would not throw a tantrum.</p>
+
+    <p>The safe profile ended up being:</p>
+
+<pre><code>container: MPEG-TS
+video:     H.264
+sound:     AC3
+channels:  2
+bitrate:   conservative</code></pre>
+
+    <p>I wrote a small client that asked Jellyfin for <code>PlaybackInfo</code>, explicitly disabled direct play, selected an MPEG-TS transcoding URL, and exposed that stream to the receiver through an opaque local URL.</p>
+
+    <p>The first real movie I used was <em>A Trip to the Moon</em>.</p>
+
+    <p>The source file was not even in a receiver-friendly format.</p>
+
+    <p>Jellyfin transcoded it.</p>
+
+    <p>The HR54 fetched the resulting MPEG-TS stream.</p>
+
+    <p>I got picture and sound.</p>
+
+    <p>At that point the core problem was solved.</p>
+
+    <p>The remaining work was turning an ugly proof into an appliance.</p>
+
+    <h2>Of course pause did not pause</h2>
+
+    <p>I assumed the vendor playback API would have useful transport controls.</p>
+
+    <p>It technically had commands with names like pause and stop.</p>
+
+    <p>They also technically did fuck all for this playback path.</p>
+
+    <p>The reason became obvious in the logs:</p>
+
+<pre><code>Cannot pause, no vodcapture created</code></pre>
+
+    <p>The normal DIRECTV transport machinery expects a <code>VODCapture</code> object.</p>
+
+    <p>Plain <code>playURL</code> does not create one.</p>
+
+    <p>So I stopped trying to make the middleware pause itself.</p>
+
+    <p>I owned the HTTP socket.</p>
+
+    <p>That is better.</p>
+
+    <p>Pause became "stop sending bytes but keep the socket open."</p>
+
+    <p>Resume became "start sending bytes again."</p>
+
+    <p>Stop became "close the stream."</p>
+
+    <p>Seek became "ask Jellyfin for a new stream starting at a different <code>StartTimeTicks</code> value and restart playback."</p>
+
+<pre><code>pause  -> gate MPEG-TS bytes
+resume -> release gate
+stop   -> EOF
+seek   -> new Jellyfin transcode at offset</code></pre>
+
+    <p>This worked extremely well until the pause was long enough for the receiver to decide the stream had starved to death.</p>
+
+    <p>That happened around twenty seconds.</p>
+
+    <p>So short pauses keep the connection.</p>
+
+    <p>Long pauses restart the transcode at the stored playback position.</p>
+
+    <p>It is not elegant.</p>
+
+    <p>It is reliable.</p>
+
+    <h2>I needed a UI on the actual box</h2>
+
+    <p>For a while I had a perfectly functional browser remote on another machine.</p>
+
+    <p>That was useful for development and completely unacceptable as the final product.</p>
+
+    <p>If I have to pick up a laptop to use my hacked set-top box, I have made a very elaborate Chromecast with worse judgment.</p>
+
+    <p>The HR54 already has an ITV/WebKit application environment.</p>
+
+    <p>So the next job was to make it render my own page.</p>
+
+    <p>The first test was deceptively encouraging.</p>
+
+    <p>I could start an app with a local URL.</p>
+
+    <p>WebKit fetched the HTML, CSS, and JavaScript.</p>
+
+    <p>XHR calls worked.</p>
+
+    <p>The vendor key dispatcher came alive.</p>
+
+    <p>And the TV still showed the stock DIRECTV screen.</p>
+
+    <p>Excellent.</p>
+
+    <h2>Running is not the same as visible</h2>
+
+    <p>The direct ITV launch path created a perfectly healthy hidden application.</p>
+
+    <p>It had no useful ownership of the visible graphics plane.</p>
+
+    <p>This sent me into the receiver's Druid app-service plumbing: <code>TvAppService</code>, <code>BbAppService</code>, <code>ItvService</code>, app lifecycle callbacks, screen ownership, and the various ways the stock UI transitions between surfaces.</p>
+
+    <p>The practical solution was not to rewrite the entire UI stack.</p>
+
+    <p>The receiver-native launcher learned to normalize the Druid state first:</p>
+
+<pre><code>clear blocking OSD
+    |
+walk back toward LiveTV screen 2320
+    |
+launch ITV app
+    |
+WebKit owns the visible TV surface</code></pre>
+
+    <p>That produced a reliable full-screen Jellyfin page instead of a weird overlay on top of DIRECTV's menus.</p>
+
+    <p>The DOM itself reports a 1920x1080 canvas.</p>
+
+    <p>The underlying WebKit/GL implementation is ancient and internally weird.</p>
+
+    <p>I stopped caring once the pixels were where I wanted them.</p>
+
+    <h2>The TV client is deliberately simple</h2>
+
+    <p>I briefly had a page that looked like a desktop web app shrunk onto a television.</p>
+
+    <p>It was awful.</p>
+
+    <p>The final UI is an ES5-compatible 10-foot interface because this WebKit is old enough to have opinions about JavaScript that should probably be in a museum.</p>
+
+    <p>The important pieces are:</p>
+
+<pre><code>large type
+large focus targets
+UP/DOWN/LEFT/RIGHT
+SELECT
+BACK/EXIT
+six-item paging
+on-screen keyboard
+search
+saved browse state</code></pre>
+
+    <p>No mouse.</p>
+
+    <p>No touch.</p>
+
+    <p>No modern framework.</p>
+
+    <p>No reason to make a 1.3 GHz MIPS DVR parse a megabyte of JavaScript because somebody discovered React in 2018.</p>
+
+    <p>The DIRECTV remote moves a deterministic focus model around the page.</p>
+
+    <p>Search uses a large on-screen keyboard.</p>
+
+    <p>The backend filters out Jellyfin's virtual/non-file items so I do not end up presenting series folders as if they were playable video files.</p>
+
+    <h2>Authentication needed to stop being a developer hack</h2>
+
+    <p>The first playback proof used a pre-provisioned Jellyfin API key.</p>
+
+    <p>That is fine when the user is me sitting at a shell.</p>
+
+    <p>It is not a real appliance login flow.</p>
+
+    <p>Jellyfin supports Quick Connect, which is exactly the sort of thing this box needs.</p>
+
+    <p>The TV shows a six-character public code.</p>
+
+    <p>I approve it from another already-authenticated Jellyfin client.</p>
+
+    <p>The receiver exchanges the Quick Connect secret for a normal user token and stores that token under persistent <code>/var</code> storage with private permissions.</p>
+
+<pre><code>TV: GET CODE
+    |
+    v
+six-character code
+    |
+    v
+approve elsewhere
+    |
+    v
+HR54 gets user token
+    |
+    v
+persist token on receiver</code></pre>
+
+    <p>The secret and access token never need to live in the old WebKit page.</p>
+
+    <p>The browser is presentation.</p>
+
+    <p>The native backend owns credentials.</p>
+
+    <h2>I accidentally built a client/server system and then removed the server</h2>
+
+    <p>The first useful version had a Linux development machine at <code>.25</code> doing all the smart work.</p>
+
+    <p>The HR54 served the page locally, but API requests, auth, search, artwork, playback orchestration, and stream relay all bounced through the other machine.</p>
+
+    <p>It worked.</p>
+
+    <p>It was also bullshit.</p>
+
+    <p>If the goal is to turn the HR54 into a Jellyfin box, a second always-on computer should not be part of the runtime dependency graph.</p>
+
+    <p>So I wrote the backend again in C for the receiver.</p>
+
+    <p>The result is <code>hr54-jf</code>: a small static MIPS32 service that runs directly on the DVR.</p>
+
+    <p>It implements only what the TV client actually needs:</p>
+
+<pre><code>/api/status
+/api/auth/status
+/api/auth/start
+/api/auth/poll
+/api/auth/logout
+/api/libraries
+/api/items
+/api/play
+/api/transport
+/api/seek
+/api/tv/state
+/art/&lt;item&gt;
+/play/&lt;opaque-token&gt;.ts</code></pre>
+
+    <p>It has a tiny HTTP client.</p>
+
+    <p>It has a tiny JSON parser.</p>
+
+    <p>It handles Quick Connect.</p>
+
+    <p>It asks Jellyfin for playback information.</p>
+
+    <p>It relays the MPEG-TS stream.</p>
+
+    <p>It gates bytes for pause.</p>
+
+    <p>It restarts at offsets for seek and long-pause resume.</p>
+
+    <p>It invokes the receiver's local playback wrapper.</p>
+
+    <p>It stores auth and browse state locally.</p>
+
+    <p>It also watches the stock UI and launches the Jellyfin WebKit page when I hit the menu path.</p>
+
+    <p>The final topology is pleasantly stupid:</p>
+
+<pre><code>DIRECTV remote
+      |
+      v
+HR54 ITV/WebKit UI
+      |
+      v
+hr54-jf :8130
+      |
+      v
+Jellyfin :8096
+      |
+      v
+MPEG-TS / H.264 / AC3
+      |
+      v
+HR54 playURL
+      |
+      v
+Broadcom decoder
+      |
+      v
+HDMI</code></pre>
+
+    <p>The old helper machine can be powered off.</p>
+
+    <p>That was the actual definition of done.</p>
+
+    <h2>Wi-Fi was its own stupid little adventure</h2>
+
+    <p>The receiver has Wi-Fi hardware.</p>
+
+    <p>It does not have <code>wpa_supplicant</code>, <code>iw</code>, NetworkManager, or any of the tools you would normally use to configure Wi-Fi on Linux.</p>
+
+    <p>Instead it has a vendor daemon called <code>wlanmanager</code>, Broadcom libraries, proprietary IPC sockets, and saved connection state in the receiver's NVRAM manager.</p>
+
+    <p>So I stopped looking for Linux Wi-Fi configuration and started treating it like an appliance.</p>
+
+    <p>The saved WLAN profile turned out to live in NVRAM object type 84.</p>
+
+    <p>I mapped the object layout, found the SSID and credential fields, figured out the checksum format, generated a corrected image offline, and then used the vendor NVRAM write primitive to update only the required byte ranges.</p>
+
+<pre><code>/dev/nds/nvram0
+  |
+  +-- object 84: Wi-Fi profile
+        |
+        +-- SSID
+        +-- credential
+        `-- simple big-endian byte-sum checksum</code></pre>
+
+    <p>I did not write the entire 64 KiB device just because I technically could.</p>
+
+    <p>The vendor library already had <code>NVWriteBytesToEEPROM</code>.</p>
+
+    <p>Using that for guarded range writes was much less exciting.</p>
+
+    <p>Less exciting is good when the thing you are editing is the configuration storage required to get back into the box.</p>
+
+    <p>After reboot, <code>wl0</code> associated, DHCP came up, and the receiver stayed reachable.</p>
+
+    <p>Ethernet remained intact the entire time because I am not interested in manufacturing my own recovery problem.</p>
+
+    <h2>Persistence stayed boring on purpose</h2>
+
+    <p>I never wanted a pile of manual post-boot steps.</p>
+
+    <p>The existing asset-7 startup wrapper became the one place that restores the modifications.</p>
+
+    <p>The final version starts <code>hr54-jf</code> on port 8130, restores the required firewall rule, mounts any UI overlays, and then gets out of the way.</p>
+
+    <p>The important persistent state lives under:</p>
+
+<pre><code>/var/hr54-persist/jellyfin/
+    bin/
+    config/
+    state/
+    cache/
+    log/
+    ui/
+    www/</code></pre>
+
+    <p>Everything remains outside flash.</p>
+
+    <p>Every persistent replacement has a rollback copy.</p>
+
+    <p>The stock SquashFS stays stock.</p>
+
+    <p>I can remove the overlays and get the original files back.</p>
+
+    <p>That is a much nicer place to be than "I hex-edited some NAND and now I hope this boots."</p>
+
+    <h2>The test that mattered was turning the other computer off</h2>
+
+    <p>For a while I kept almost declaring the project finished while the development machine was still quietly doing useful work.</p>
+
+    <p>That is not standalone.</p>
+
+    <p>Eventually I made the acceptance test brutally simple:</p>
+
+<pre><code>192.168.88.25:8130 DOWN</code></pre>
+
+    <p>Then I tested everything again.</p>
+
+<pre><code>cold boot
+Wi-Fi
+MENU
+fullscreen Jellyfin
+Quick Connect
+libraries
+search
+artwork
+play
+picture + audio
+pause
+resume
+seek
+stop
+return to Jellyfin
+saved UI state</code></pre>
+
+    <p>All of it ran directly between the HR54 and the Jellyfin server.</p>
+
+    <p>That is the point where the project stopped being "a DVR that can play Jellyfin" and became "a Jellyfin appliance that happens to be a DIRECTV DVR."</p>
+
+    <h2>What I did not replace</h2>
+
+    <p>This project worked because I resisted the urge to replace everything.</p>
+
+    <p>I kept:</p>
+
+<pre><code>DIRECTV's Linux
+DIRECTV's Druid UI shell
+DIRECTV's ITV/WebKit runtime
+DIRECTV's MediaPlayer
+DIRECTV's dvr_core
+Broadcom's demux and decoders
+DIRECTV's remote-control plumbing
+DIRECTV's HDMI path</code></pre>
+
+    <p>I replaced the pieces that were actually in my way:</p>
+
+<pre><code>boot-time control
+satellite-blocking OSD state
+media source
+TV application
+Jellyfin orchestration
+transport semantics
+auth state
+Wi-Fi profile
+runtime dependency on the helper PC</code></pre>
+
+    <p>That distinction saved an absurd amount of work.</p>
+
+    <p>The HR54 already knew how to be a very competent set-top box.</p>
+
+    <p>It just had extremely specific opinions about what it was supposed to be connected to.</p>
+
+    <h2>There are still DIRECTV fossils in it</h2>
+
+    <p>The box is now useful, but it is not pretending it was born this way.</p>
+
+    <p>The stock middleware can still surface old access-card warnings in places I do not care about.</p>
+
+    <p>The stock bouncing screensaver still has some branding behavior I am cleaning up.</p>
+
+    <p>Those are cosmetic fossils, not architectural dependencies.</p>
+
+    <p>At this point I am replacing warning text with useful instructions and chasing the actual image resource the bouncing-logo screensaver renders.</p>
+
+    <p>The important part is already done.</p>
+
+    <h2>The finished result</h2>
+
+    <p>I can unplug the Ethernet cable.</p>
+
+    <p>I can reboot the receiver.</p>
+
+    <p>It joins Wi-Fi.</p>
+
+    <p>The native Jellyfin service comes up on the box.</p>
+
+    <p>I press the DIRECTV remote.</p>
+
+    <p>Jellyfin appears on the TV.</p>
+
+    <p>I can search with the on-screen keyboard, start a movie, pause it, seek it, stop it, and return to the same Jellyfin state.</p>
+
+    <p>There is no helper PC in the loop.</p>
+
+    <p>There is no satellite connection.</p>
+
+    <p>There is no reason for this thing to be useful in 2026.</p>
+
+    <p>Which, obviously, is why I like it now.</p>
+
+    <div class="rule"></div>
+
+    <p><strong>Final architecture:</strong></p>
+
+<pre><code>HR54-700
+  |
+  +-- persistent root via boot plugin wrapper
+  |
+  +-- receiver-native hr54-jf :8130
+  |      |
+  |      +-- Quick Connect
+  |      +-- Jellyfin API
+  |      +-- artwork
+  |      +-- PlaybackInfo
+  |      +-- stream relay
+  |      +-- pause/seek/stop
+  |      `-- TV state
+  |
+  +-- ITV/WebKit Jellyfin UI
+  |
+  +-- playURL
+  |
+  +-- Broadcom H.264 / AC3 decode
+  |
+  `-- HDMI
+
+        Wi-Fi
+          |
+          v
+   Jellyfin server</code></pre>
+
+    <p>That is the whole trick.</p>
+
+    <p>Do as little as possible on the weird old hardware.</p>
+
+    <p>But make sure the weird old hardware owns the final product.</p>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>void@hr54:~$ </span><span class="cursor" aria-hidden="true"></span>
+    </div>
+  </footer>
+</body>
+</html>
