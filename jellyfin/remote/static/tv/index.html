@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Jellyfin TV</title><link rel="stylesheet" href="/tv/app.css"></head>
+<body><div id="root"><div id="backdrop"></div>
+  <div id="top"><div id="brand">JELLYFIN</div><button id="accountButton" type="button">ACCOUNT</button><button id="searchButton" type="button">SEARCH</button></div>
+  <div id="browse">
+    <div id="libraries"></div>
+    <div id="heading"></div>
+    <div id="items"></div>
+    <div id="pager"><button id="prev" type="button">&#9664; PREV</button><span id="page"></span><button id="next" type="button">NEXT &#9654;</button></div>
+  </div>
+  <div id="searchView" class="hidden"><div id="queryLabel">SEARCH TITLE</div><div id="query"></div><div id="keyboard"></div></div>
+  <div id="authView" class="hidden"><div id="authTitle">JELLYFIN SIGN IN</div><div id="authText">Use Quick Connect to sign in.</div><div id="authCode"></div><button id="authAction" type="button">GET CODE</button></div>
+  <div id="message" class="hidden"></div>
+</div><script src="/tv/app.js"></script></body></html>

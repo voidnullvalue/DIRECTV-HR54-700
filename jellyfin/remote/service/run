@@ -1,0 +1,37 @@
+#!/bin/sh
+# runit `run` script for the SUPERSEDED host-side Python backend.
+#
+# ============================ HISTORICAL ============================
+# This ran on a development HOST. The shipped appliance is the
+# receiver-native C backend (jellyfin/remote/hr54_jf.c), started on the
+# receiver itself by the persistent /var boot hook. See
+# jellyfin/remote/README.md and docs/PERSISTENCE.md.
+# It is kept for reference and for the host-side test harness.
+# ====================================================================
+#
+# Every endpoint is an environment variable so nothing is tied to one
+# machine. No token or password is ever passed on this command line --
+# server.py reads and writes the credential itself under $STATE.
+set -eu
+
+: "${HR54_REPO:?set HR54_REPO to the checkout root}"
+: "${JELLYFIN_SERVER:?set JELLYFIN_SERVER, e.g. http://192.0.2.10:8096}"
+: "${HR54_IP:?set HR54_IP to the LAN address of the receiver}"
+
+STATE="${HR54_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/hr54-jellyfin}"
+RUN="${HR54_RUN:-${TMPDIR:-/tmp}/hr54-remote}"
+
+mkdir -p "$STATE" "$RUN"
+chmod 700 "$STATE"
+printf '%s\n' "$$" > "$RUN/hr54-remote.pid"
+
+export HR54_TV_STATE_FILE="$STATE/tv-state.json"
+cd "$HR54_REPO"
+
+set -- --server "$JELLYFIN_SERVER" --state-dir "$STATE" --receiver "$HR54_IP"
+if [ -n "${HR54_IP_FALLBACK:-}" ]; then
+    set -- "$@" --receiver-fallback "$HR54_IP_FALLBACK"
+fi
+set -- "$@" --port "${HR54_PORT:-8130}" --quiet
+
+exec "${PYTHON:-/usr/bin/python3}" jellyfin/remote/server.py "$@"

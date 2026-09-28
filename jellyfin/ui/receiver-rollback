@@ -1,0 +1,14 @@
+#!/bin/sh
+# Restore the exact asset-7 image that preceded the Jellyfin Settings trial.
+set -eu
+BASE=/var/hr54-persist
+DEST=/var/network/plugins/7_6933_6840.squashfs
+BACKUP=$BASE/backup/asset7-before-jellyfin.squashfs
+test -f "$BACKUP"
+rm -f "$BASE/jellyfin/ui/enable-settings-overlay"
+umount /opt/ui_assets/assetspack/curation/layouts/STB_Settings.fb 2>/dev/null || true
+cp "$BACKUP" "$DEST.rollback"
+chmod 644 "$DEST.rollback"
+mv -f "$DEST.rollback" "$DEST"
+sync
+echo 'Stock Settings resource restored; original asset-7 image active on next boot.'

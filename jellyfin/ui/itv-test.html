@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>JELLYFIN TEST</title>
+<style>
+  html,body { background:#0b1020; color:#e8f0ff; margin:0; padding:0;
+             font-family:sans-serif; overflow:hidden; }
+  #wrap { padding:40px 60px; }
+  h1 { font-size:64px; margin:0 0 10px 0; letter-spacing:2px; }
+  .sub { font-size:30px; color:#7fa8ff; margin-bottom:30px; }
+  .keys { font-size:34px; line-height:1.7; }
+  .k { display:inline-block; border:2px solid #7fa8ff; border-radius:8px;
+       padding:2px 16px; margin-right:12px; }
+  #log { margin-top:30px; font-size:26px; color:#9fe8a0; }
+  #err { margin-top:20px; font-size:24px; color:#ff8080; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>JELLYFIN TEST</h1>
+  <div class="sub">ITV renderer proof page</div>
+  <div class="keys">
+    <span class="k">UP</span><span class="k">DOWN</span><br>
+    <span class="k">LEFT</span><span class="k">RIGHT</span><br>
+    <span class="k">SELECT / OK</span><br>
+    <span class="k">BACK / EXIT</span>
+  </div>
+  <div id="log">no key events yet</div>
+  <div id="err"></div>
+</div>
+<script>
+var count = 0;
+function report(where) {
+  count++;
+  document.getElementById('log').innerHTML =
+    'KEY EVENT #' + count + ' via ' + where +
+    '<br>keycode=' + (window.event ? window.event.keyCode : 'n/a') +
+    ' key=' + (window.event ? window.event.key : 'n/a');
+}
+document.addEventListener('keydown', function(e){ report('keydown'); }, false);
+document.addEventListener('keypress', function(e){ report('keypress'); }, false);
+document.addEventListener('keyup', function(e){ report('keyup'); }, false);
+// ITV apps normally receive remote input as DOM key events; if the host
+// bridge exposes a channel, surface it too.
+try {
+  if (window.dtv && window.dtv.on) {
+    window.dtv.on('remoteKey', function(k){ report('dtv.remoteKey key=' + k); });
+  }
+} catch (e) {
+  document.getElementById('err').innerHTML = 'bridge probe: ' + e;
+}
+var x = new XMLHttpRequest();
+x.onreadystatechange = function(){
+  if (x.readyState === 4) {
+    document.getElementById('log').innerHTML +=
+      '<br>XHR ok status=' + x.status + ' len=' + (x.responseText || '').length;
+  }
+};
+x.open('GET', '/itv/ping', true);
+x.send();
+</script>
+</body>
+</html>
