@@ -1,0 +1,42 @@
+name: Add Enter dev void metadata
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  metadata:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add blog metadata marker
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("index.html")
+          text = path.read_text()
+          if 'name="devvoid:post"' in text:
+              raise SystemExit(0)
+
+          needle = '  <meta property="og:type" content="article">\n'
+          block = '''  <meta property="og:type" content="article">\n  <meta name="devvoid:post" content="1">\n  <meta name="devvoid:title" content="I Turned a DIRECTV HR54-700 Into a Standalone Jellyfin Box">\n  <meta name="devvoid:summary" content="A free DIRECTV HR54-700 turned into a standalone Jellyfin box using the stock Broadcom decoder, vendor WebKit, Wi-Fi, Quick Connect, and a native MIPS backend.">\n  <meta name="devvoid:published" content="2026-09-28T17:49:46Z">\n  <meta name="devvoid:tags" content="directv, hr54, jellyfin, reverse-engineering, embedded-linux">\n'''
+          if needle not in text:
+              raise SystemExit("could not find og:type marker")
+          path.write_text(text.replace(needle, block, 1))
+          PY
+
+      - name: Commit metadata
+        run: |
+          if git diff --quiet -- index.html; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Mark page for Enter /dev/void/"
+          git push
