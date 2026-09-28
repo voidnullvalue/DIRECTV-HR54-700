@@ -35,14 +35,19 @@ Do not install unless the final line is `OFFLINE_VERIFY_V3=PASS`.
 
 ## Install
 
-With the powered-down HR54 disk attached:
+With the powered-down HR54 disk attached. Identify the disk by size **and**
+serial first, and read the offline-verification notes in
+[../docs/ROOT.md](../docs/ROOT.md) before running anything.
 
 ```sh
-su - code
-cd /home/void/vroomfondle/dvr/hr54-re/poc-hardware
-sudo -v
+lsblk -dno NAME,SIZE,SERIAL,MODEL        # find YOUR disk
+export HR54_DISK_SERIAL=<your-disk-serial>
+sudo -v                                  # or set HR54_SUDO_PASS / ~/.hr54-sudo-pass
 ./install-v3-via-mips-vm.sh I_UNDERSTAND_ONLY_CONFIRMED_PARTITION_2
 ```
+
+`uninstall-files.sh` deliberately does nothing: it prints the two paths to
+remove and exits non-zero. The refusal is the point.
 
 The script dynamically resolves the unique disk with serial `<DISK_SERIAL>`,
 validates the disk plus all four partition sizes and starts, requires read-only
